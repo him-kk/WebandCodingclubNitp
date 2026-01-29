@@ -30,8 +30,8 @@ const createAdmin = async () => {
     // Create new admin user
     const adminUser = new User({
       name: 'Admin User',
-      email: 'admin@webcodingclub.com',
-      password: 'admin123456', // This will be hashed automatically by your User model
+      email: ' process.env.ADMIN_EMAIL',
+      password: 'process.env.ADMIN_PASSWORD', // This will be hashed automatically by your User model
       role: 'admin',
       points: 0,
       level: 1,
@@ -43,8 +43,6 @@ const createAdmin = async () => {
     await adminUser.save();
 
     console.log(' Admin user created successfully!');
-    console.log('Email: admin@webcodingclub.com');
-    console.log('Password: admin123456');
     console.log('  Please change this password after first login!');
 
     process.exit(0);
