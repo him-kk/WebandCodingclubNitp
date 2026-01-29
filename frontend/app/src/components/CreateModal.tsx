@@ -24,7 +24,8 @@ const CreateModal = ({ type, onClose, onSuccess }: any) => {
           requirements: '',
           tags: '',
           points: 100,
-          status: 'upcoming'
+          status: 'upcoming',
+          registrationLink: '' // NEW FIELD
         };
       case 'projects':
         return {
@@ -258,7 +259,23 @@ const CreateModal = ({ type, onClose, onSuccess }: any) => {
         />
         <p className="text-xs text-light/50 mt-1">Optional: Provide a URL to an image for this event</p>
       </div>
-
+        {/* NEW REGISTRATION LINK FIELD */}
+              <div>
+                <label className="block text-sm text-light/70 mb-2">
+                  Registration Link
+                </label>
+                <input
+                  type="url"
+                  name="registrationLink"
+                  value={formData.registrationLink}
+                  onChange={handleChange}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-orange/50 focus:outline-none"
+                  placeholder="https://forms.google.com/your-registration-form"
+                />
+                <p className="text-xs text-light/50 mt-1">
+                  Add a link where users can register for this event (e.g., Google Form, Eventbrite, etc.)
+                </p>
+              </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-light/70 mb-1">Category</label>
