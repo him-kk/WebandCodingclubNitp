@@ -11,7 +11,7 @@ node_modules/
 backend/.env
 # Build outputs
 build/
-*/dist/
+# */dist/
 */build/
 
 # Logs
@@ -72,7 +72,7 @@ jspm_packages/
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+# dist
 
 # Gatsby files
 .cache/
