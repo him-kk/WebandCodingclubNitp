@@ -12,6 +12,7 @@ const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const http_1 = require("http");
 const socket_io_1 = require("socket.io");
 const dotenv_1 = __importDefault(require("dotenv"));
+const admin_1 = __importDefault(require("./routes/admin"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const users_1 = __importDefault(require("./routes/users"));
 const events_1 = __importDefault(require("./routes/events"));
@@ -31,7 +32,7 @@ const app = (0, express_1.default)();
 const server = (0, http_1.createServer)(app);
 const io = new socket_io_1.Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+        origin: ['http://localhost:5173', 'http://localhost:5174'],
         credentials: true,
     },
 });
@@ -47,15 +48,13 @@ app.use((0, helmet_1.default)({
     },
 }));
 const limiter = (0, express_rate_limit_1.default)({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
-    max: parseInt(process.env.RATE_LIMIT_MAX || '100'),
+    windowMs: 15 * 60 * 1000,
+    max: 500,
     message: 'Too many requests from this IP, please try again later.',
-    standardHeaders: true,
-    legacyHeaders: false,
 });
 app.use('/api/', limiter);
 app.use((0, cors_1.default)({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: ['http://localhost:5173', 'http://localhost:5174', process.env.FRONTEND_URL || 'http://localhost:5174'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token'],
@@ -76,6 +75,7 @@ app.use('/api/leaderboard', leaderboard_1.default);
 app.use('/api/resources', resources_1.default);
 app.use('/api/chatbot', chatbot_1.default);
 app.use('/api/contact', contact_1.default);
+app.use('/api/admin', admin_1.default);
 app.get('/api/health', (req, res) => {
     res.status(200).json({
         status: 'success',
@@ -94,7 +94,7 @@ const startServer = async () => {
         server.listen(PORT, () => {
             console.log(` Web and Coding Club Server running on port ${PORT}`);
             console.log(` Environment: ${process.env.NODE_ENV}`);
-            console.log(` Frontend: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+            console.log(` Frontend: ${process.env.FRONTEND_URL || 'http://localhost:5174'}`);
         });
     }
     catch (error) {

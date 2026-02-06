@@ -7,14 +7,11 @@ export interface IEvent extends Document {
     location: string;
     image: string;
     category: 'workshop' | 'hackathon' | 'competition' | 'meetup' | 'webinar';
-    attendees: mongoose.Types.ObjectId[];
     maxAttendees: number;
-    isOnline: boolean;
-    onlineLink?: string;
-    requirements?: string[];
-    tags: string[];
-    status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
+    attendees: mongoose.Types.ObjectId[];
     points: number;
+    status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
+    registrationLink?: string;
     createdBy: mongoose.Types.ObjectId;
     createdAt: Date;
     updatedAt: Date;

@@ -14,13 +14,18 @@ router.get('/', async (req, res) => {
         const limit = parseInt(req.query.limit) || 20;
         const skip = (page - 1) * limit;
         const cacheKey = `leaderboard:all:${page}:${limit}`;
-        const cached = await redis_1.redis.getJSON(cacheKey);
-        if (cached) {
-            return res.status(200).json({
-                success: true,
-                cached: true,
-                ...cached,
-            });
+        try {
+            const cached = await redis_1.redis.getJSON(cacheKey);
+            if (cached) {
+                return res.status(200).json({
+                    success: true,
+                    cached: true,
+                    ...cached,
+                });
+            }
+        }
+        catch (redisError) {
+            console.warn('Redis cache read failed:', redisError);
         }
         const users = await User_1.default.find({ isActive: true })
             .select('name email points level badges streak avatar createdAt')
@@ -47,8 +52,13 @@ router.get('/', async (req, res) => {
             pages: Math.ceil(total / limit),
             data: leaderboard,
         };
-        await redis_1.redis.setJSON(cacheKey, result, 300);
-        res.status(200).json({
+        try {
+            await redis_1.redis.setJSON(cacheKey, result, 300);
+        }
+        catch (redisError) {
+            console.warn('Redis cache write failed:', redisError);
+        }
+        return res.status(200).json({
             success: true,
             cached: false,
             ...result,
@@ -56,7 +66,7 @@ router.get('/', async (req, res) => {
     }
     catch (error) {
         console.error('Get leaderboard error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Server error',
         });
@@ -90,7 +100,7 @@ router.get('/rank/:userId', auth_1.protect, async (req, res) => {
             ...u.toObject(),
             isCurrentUser: u._id.toString() === userId,
         }));
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             data: {
                 userRank: rank,
@@ -101,7 +111,7 @@ router.get('/rank/:userId', auth_1.protect, async (req, res) => {
     }
     catch (error) {
         console.error('Get user rank error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Server error',
         });
@@ -111,13 +121,18 @@ router.get('/top/:count', async (req, res) => {
     try {
         const count = Math.min(parseInt(req.params.count) || 10, 50);
         const cacheKey = `leaderboard:top:${count}`;
-        const cached = await redis_1.redis.getJSON(cacheKey);
-        if (cached) {
-            return res.status(200).json({
-                success: true,
-                cached: true,
-                data: cached,
-            });
+        try {
+            const cached = await redis_1.redis.getJSON(cacheKey);
+            if (cached) {
+                return res.status(200).json({
+                    success: true,
+                    cached: true,
+                    data: cached,
+                });
+            }
+        }
+        catch (redisError) {
+            console.warn('Redis cache read failed:', redisError);
         }
         const users = await User_1.default.find({ isActive: true })
             .select('name email points level badges streak avatar')
@@ -127,8 +142,13 @@ router.get('/top/:count', async (req, res) => {
             rank: index + 1,
             ...user.toObject(),
         }));
-        await redis_1.redis.setJSON(cacheKey, leaderboard, 300);
-        res.status(200).json({
+        try {
+            await redis_1.redis.setJSON(cacheKey, leaderboard, 300);
+        }
+        catch (redisError) {
+            console.warn('Redis cache write failed:', redisError);
+        }
+        return res.status(200).json({
             success: true,
             cached: false,
             data: leaderboard,
@@ -136,7 +156,7 @@ router.get('/top/:count', async (req, res) => {
     }
     catch (error) {
         console.error('Get top users error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Server error',
         });
@@ -164,8 +184,13 @@ router.post('/update-points', auth_1.protect, async (req, res) => {
             user.updateLevel();
         }
         await user.save();
-        await redis_1.redis.del('leaderboard:*');
-        res.status(200).json({
+        try {
+            await redis_1.redis.del('leaderboard:*');
+        }
+        catch (redisError) {
+            console.warn('Redis cache clear failed:', redisError);
+        }
+        return res.status(200).json({
             success: true,
             message: 'Points updated successfully',
             data: {
@@ -178,7 +203,7 @@ router.post('/update-points', auth_1.protect, async (req, res) => {
     }
     catch (error) {
         console.error('Update points error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Server error',
         });

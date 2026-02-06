@@ -4,7 +4,7 @@ export interface CustomError extends Error {
     status?: string;
     isOperational?: boolean;
     code?: number;
-    keyValue?: any;
+    keyValue?: Record<string, any>;
 }
-export declare const errorHandler: (err: CustomError, req: Request, res: Response, next: NextFunction) => Response<any, Record<string, any>> | undefined;
+export declare const errorHandler: (err: CustomError, _req: Request, res: Response, _next: NextFunction) => void;
 //# sourceMappingURL=errorHandler.d.ts.map

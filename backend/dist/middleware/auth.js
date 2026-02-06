@@ -10,38 +10,47 @@ const redis_1 = require("../config/redis");
 const protect = async (req, res, next) => {
     try {
         let token = null;
-        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        if (req.headers.authorization?.startsWith('Bearer')) {
             token = req.headers.authorization.split(' ')[1];
         }
-        else if (req.cookies && req.cookies.token) {
+        else if (req.cookies?.token) {
             token = req.cookies.token;
         }
         if (!token) {
-            return res.status(401).json({
+            res.status(401).json({
                 success: false,
                 message: 'You are not logged in. Please log in to get access.',
             });
+            return;
         }
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET || 'fallback-secret');
-        const session = await redis_1.redis.getJSON(`session:${decoded.userId}`);
-        if (!session) {
-            return res.status(401).json({
-                success: false,
-                message: 'Session expired. Please log in again.',
-            });
+        try {
+            const session = await redis_1.redis.getJSON(`session:${decoded.userId}`);
+            if (!session) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Session expired. Please log in again.',
+                });
+                return;
+            }
+        }
+        catch (redisError) {
+            console.warn(' Redis unavailable, skipping session check:', redisError);
         }
         const user = await User_1.default.findById(decoded.userId).select('+isActive');
         if (!user) {
-            return res.status(401).json({
+            res.status(401).json({
                 success: false,
                 message: 'The user belonging to this token no longer exists.',
             });
+            return;
         }
         if (!user.isActive) {
-            return res.status(401).json({
+            res.status(401).json({
                 success: false,
                 message: 'User account is deactivated.',
             });
+            return;
         }
         req.user = {
             userId: decoded.userId,
@@ -52,10 +61,11 @@ const protect = async (req, res, next) => {
     }
     catch (error) {
         if (error instanceof jsonwebtoken_1.default.JsonWebTokenError) {
-            return res.status(401).json({
+            res.status(401).json({
                 success: false,
                 message: 'Invalid token. Please log in again.',
             });
+            return;
         }
         console.error('Auth middleware error:', error);
         res.status(500).json({
@@ -68,16 +78,18 @@ exports.protect = protect;
 const restrictTo = (...roles) => {
     return (req, res, next) => {
         if (!req.user) {
-            return res.status(401).json({
+            res.status(401).json({
                 success: false,
                 message: 'You are not logged in',
             });
+            return;
         }
         if (!roles.includes(req.user.role)) {
-            return res.status(403).json({
+            res.status(403).json({
                 success: false,
                 message: 'You do not have permission to perform this action',
             });
+            return;
         }
         next();
     };

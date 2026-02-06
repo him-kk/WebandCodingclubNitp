@@ -38,30 +38,44 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const express_validator_1 = require("express-validator");
+const mongoose_1 = require("mongoose");
 const Event_1 = __importDefault(require("../models/Event"));
 const auth_1 = require("../middleware/auth");
 const redis_1 = require("../config/redis");
 const router = express_1.default.Router();
-router.get('/', async (req, res) => {
+async function invalidateEventCache() {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
+        await redis_1.redis.delPattern('events:*');
+    }
+    catch (error) {
+        console.warn('Failed to invalidate event cache:', error);
+    }
+}
+router.get('/', async (_req, res) => {
+    try {
+        const page = parseInt(_req.query.page) || 1;
+        const limit = parseInt(_req.query.limit) || 10;
         const skip = (page - 1) * limit;
-        const category = req.query.category;
-        const status = req.query.status;
+        const category = _req.query.category;
+        const status = _req.query.status;
         const filter = {};
         if (category)
             filter.category = category;
         if (status)
             filter.status = status;
         const cacheKey = `events:${JSON.stringify(filter)}:${page}:${limit}`;
-        const cached = await redis_1.redis.getJSON(cacheKey);
-        if (cached) {
-            return res.status(200).json({
-                success: true,
-                cached: true,
-                ...cached,
-            });
+        try {
+            const cached = await redis_1.redis.getJSON(cacheKey);
+            if (cached) {
+                return res.status(200).json({
+                    success: true,
+                    cached: true,
+                    ...cached,
+                });
+            }
+        }
+        catch (redisError) {
+            console.warn('Redis cache read failed:', redisError);
         }
         const events = await Event_1.default.find(filter)
             .populate('createdBy', 'name email')
@@ -78,8 +92,13 @@ router.get('/', async (req, res) => {
             pages: Math.ceil(total / limit),
             data: events,
         };
-        await redis_1.redis.setJSON(cacheKey, result, 600);
-        res.status(200).json({
+        try {
+            await redis_1.redis.setJSON(cacheKey, result, 600);
+        }
+        catch (redisError) {
+            console.warn('Redis cache write failed:', redisError);
+        }
+        return res.status(200).json({
             success: true,
             cached: false,
             ...result,
@@ -87,7 +106,7 @@ router.get('/', async (req, res) => {
     }
     catch (error) {
         console.error('Get events error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Server error',
         });
@@ -104,20 +123,20 @@ router.get('/:id', async (req, res) => {
                 message: 'Event not found',
             });
         }
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             data: event,
         });
     }
     catch (error) {
         console.error('Get event error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Server error',
         });
     }
 });
-router.post('/', auth_1.protect, (0, auth_1.restrictTo)('admin', 'lead'), [
+router.post('/', auth_1.protect, (0, auth_1.restrictTo)('admin', 'lead', 'Coordinator', 'President'), [
     (0, express_validator_1.body)('title')
         .trim()
         .isLength({ min: 3, max: 100 })
@@ -138,6 +157,10 @@ router.post('/', auth_1.protect, (0, auth_1.restrictTo)('admin', 'lead'), [
     (0, express_validator_1.body)('category')
         .isIn(['workshop', 'hackathon', 'competition', 'meetup', 'webinar'])
         .withMessage('Invalid category'),
+    (0, express_validator_1.body)('registrationLink')
+        .optional()
+        .isURL()
+        .withMessage('Please provide a valid URL for registration link'),
 ], async (req, res) => {
     try {
         const errors = (0, express_validator_1.validationResult)(req);
@@ -147,13 +170,19 @@ router.post('/', auth_1.protect, (0, auth_1.restrictTo)('admin', 'lead'), [
                 errors: errors.array(),
             });
         }
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized',
+            });
+        }
         const event = new Event_1.default({
             ...req.body,
             createdBy: req.user.userId,
         });
         await event.save();
-        await redis_1.redis.del('events:*');
-        res.status(201).json({
+        await invalidateEventCache();
+        return res.status(201).json({
             success: true,
             message: 'Event created successfully',
             data: event,
@@ -161,7 +190,107 @@ router.post('/', auth_1.protect, (0, auth_1.restrictTo)('admin', 'lead'), [
     }
     catch (error) {
         console.error('Create event error:', error);
-        res.status(500).json({
+        return res.status(500).json({
+            success: false,
+            message: 'Server error',
+        });
+    }
+});
+router.put('/:id', auth_1.protect, (0, auth_1.restrictTo)('admin', 'lead', 'Coordinator', 'President'), [
+    (0, express_validator_1.body)('title')
+        .optional()
+        .trim()
+        .isLength({ min: 3, max: 100 })
+        .withMessage('Title must be between 3 and 100 characters'),
+    (0, express_validator_1.body)('description')
+        .optional()
+        .trim()
+        .isLength({ min: 10, max: 1000 })
+        .withMessage('Description must be between 10 and 1000 characters'),
+    (0, express_validator_1.body)('date')
+        .optional()
+        .isISO8601()
+        .withMessage('Please provide a valid date'),
+    (0, express_validator_1.body)('category')
+        .optional()
+        .isIn(['workshop', 'hackathon', 'competition', 'meetup', 'webinar'])
+        .withMessage('Invalid category'),
+    (0, express_validator_1.body)('status')
+        .optional()
+        .isIn(['upcoming', 'ongoing', 'completed', 'cancelled'])
+        .withMessage('Invalid status'),
+    (0, express_validator_1.body)('registrationLink')
+        .optional()
+        .isURL()
+        .withMessage('Please provide a valid URL for registration link'),
+], async (req, res) => {
+    try {
+        const errors = (0, express_validator_1.validationResult)(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                errors: errors.array(),
+            });
+        }
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized',
+            });
+        }
+        const event = await Event_1.default.findById(req.params.id);
+        if (!event) {
+            return res.status(404).json({
+                success: false,
+                message: 'Event not found',
+            });
+        }
+        Object.keys(req.body).forEach(key => {
+            if (key !== 'createdBy' && key !== 'attendees') {
+                event[key] = req.body[key];
+            }
+        });
+        await event.save();
+        await invalidateEventCache();
+        return res.status(200).json({
+            success: true,
+            message: 'Event updated successfully',
+            data: event,
+        });
+    }
+    catch (error) {
+        console.error('Update event error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Server error',
+        });
+    }
+});
+router.delete('/:id', auth_1.protect, (0, auth_1.restrictTo)('admin', 'President', 'Coordinator'), async (req, res) => {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized',
+            });
+        }
+        const event = await Event_1.default.findById(req.params.id);
+        if (!event) {
+            return res.status(404).json({
+                success: false,
+                message: 'Event not found',
+            });
+        }
+        await Event_1.default.findByIdAndDelete(req.params.id);
+        await invalidateEventCache();
+        return res.status(200).json({
+            success: true,
+            message: 'Event deleted successfully',
+        });
+    }
+    catch (error) {
+        console.error('Delete event error:', error);
+        return res.status(500).json({
             success: false,
             message: 'Server error',
         });
@@ -176,29 +305,35 @@ router.post('/:id/register', auth_1.protect, async (req, res) => {
                 message: 'Event not found',
             });
         }
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized',
+            });
+        }
         if (event.attendees.length >= event.maxAttendees) {
             return res.status(400).json({
                 success: false,
                 message: 'Event is full',
             });
         }
-        if (event.attendees.includes(req.user.userId)) {
+        const userId = mongoose_1.Types.ObjectId.createFromHexString(req.user.userId);
+        if (event.attendees.some(id => id.equals(userId))) {
             return res.status(400).json({
                 success: false,
                 message: 'Already registered for this event',
             });
         }
-        event.attendees.push(req.user.userId);
+        event.attendees.push(userId);
         await event.save();
         const User = (await Promise.resolve().then(() => __importStar(require('../models/User')))).default;
-        const user = await User.findById(req.user.userId);
+        const user = await User.findById(userId);
         if (user) {
             user.addPoints(event.points);
             await user.save();
         }
-        await redis_1.redis.del('events:*');
-        await redis_1.redis.del(`leaderboard:*`);
-        res.status(200).json({
+        await invalidateEventCache();
+        return res.status(200).json({
             success: true,
             message: 'Successfully registered for event',
             data: {
@@ -210,13 +345,58 @@ router.post('/:id/register', auth_1.protect, async (req, res) => {
     }
     catch (error) {
         console.error('Register for event error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Server error',
         });
     }
 });
-router.get('/upcoming/next', async (req, res) => {
+router.post('/:id/unregister', auth_1.protect, async (req, res) => {
+    try {
+        const event = await Event_1.default.findById(req.params.id);
+        if (!event) {
+            return res.status(404).json({
+                success: false,
+                message: 'Event not found',
+            });
+        }
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized',
+            });
+        }
+        const userId = mongoose_1.Types.ObjectId.createFromHexString(req.user.userId);
+        const attendeeIndex = event.attendees.findIndex(id => id.equals(userId));
+        if (attendeeIndex === -1) {
+            return res.status(400).json({
+                success: false,
+                message: 'Not registered for this event',
+            });
+        }
+        event.attendees.splice(attendeeIndex, 1);
+        await event.save();
+        const User = (await Promise.resolve().then(() => __importStar(require('../models/User')))).default;
+        const user = await User.findById(userId);
+        if (user && user.points >= event.points) {
+            user.points -= event.points;
+            await user.save();
+        }
+        await invalidateEventCache();
+        return res.status(200).json({
+            success: true,
+            message: 'Successfully unregistered from event',
+        });
+    }
+    catch (error) {
+        console.error('Unregister from event error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Server error',
+        });
+    }
+});
+router.get('/upcoming/next', async (_req, res) => {
     try {
         const events = await Event_1.default.find({
             date: { $gte: new Date() },
@@ -226,7 +406,7 @@ router.get('/upcoming/next', async (req, res) => {
             .select('-__v')
             .sort({ date: 1 })
             .limit(3);
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             count: events.length,
             data: events,
@@ -234,9 +414,45 @@ router.get('/upcoming/next', async (req, res) => {
     }
     catch (error) {
         console.error('Get upcoming events error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Server error',
+        });
+    }
+});
+router.post('/admin/clear-cache', auth_1.protect, (0, auth_1.restrictTo)('admin', 'Coordinator', 'President'), async (_req, res) => {
+    try {
+        await invalidateEventCache();
+        return res.status(200).json({
+            success: true,
+            message: 'Event cache cleared successfully',
+        });
+    }
+    catch (error) {
+        console.error('Clear cache error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to clear cache',
+        });
+    }
+});
+router.get('/admin/cache-stats', auth_1.protect, (0, auth_1.restrictTo)('admin', 'Coordinator', 'President'), async (_req, res) => {
+    try {
+        const keys = await redis_1.redis.keys('events:*');
+        const stats = {
+            totalCacheKeys: keys.length,
+            cacheKeys: keys.slice(0, 10),
+        };
+        return res.status(200).json({
+            success: true,
+            data: stats,
+        });
+    }
+    catch (error) {
+        console.error('Cache stats error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to get cache stats',
         });
     }
 });

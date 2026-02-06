@@ -4,7 +4,7 @@ export interface IUser extends Document {
     email: string;
     password: string;
     avatar?: string;
-    role: 'member' | 'admin' | 'lead';
+    role: 'member' | 'Coordinator' | 'admin' | 'President' | 'lead';
     points: number;
     level: string;
     badges: string[];
@@ -19,6 +19,8 @@ export interface IUser extends Document {
     createdAt: Date;
     updatedAt: Date;
     comparePassword(candidatePassword: string): Promise<boolean>;
+    updateLevel(): void;
+    addPoints(points: number): void;
 }
 declare const _default: mongoose.Model<IUser, {}, {}, {}, mongoose.Document<unknown, {}, IUser, {}, {}> & IUser & Required<{
     _id: mongoose.Types.ObjectId;

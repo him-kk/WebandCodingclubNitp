@@ -29,20 +29,19 @@ router.post('/', [
     try {
         const errors = (0, express_validator_1.validationResult)(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                errors: errors.array(),
-            });
+            res.status(400).json({ success: false, errors: errors.array() });
+            return;
         }
         const { name, email, subject, message } = req.body;
         const ip = req.ip || 'unknown';
         const rateLimitKey = `contact:${ip}`;
-        const requestCount = await redis_1.redis.get(rateLimitKey) || '0';
-        if (parseInt(requestCount) >= 5) {
-            return res.status(429).json({
+        const requestCount = (await redis_1.redis.get(rateLimitKey)) || '0';
+        if (parseInt(requestCount, 10) >= 5) {
+            res.status(429).json({
                 success: false,
                 message: 'Too many messages. Please try again later.',
             });
+            return;
         }
         const messageId = Date.now().toString();
         const messageData = {
@@ -56,8 +55,8 @@ router.post('/', [
             status: 'new',
         };
         await redis_1.redis.setJSON(`contact:${messageId}`, messageData, 86400 * 30);
-        await redis_1.redis.incr(rateLimitKey);
-        await redis_1.redis.set(rateLimitKey, parseInt(requestCount) + 1, 3600);
+        const newCount = parseInt(requestCount, 10) + 1;
+        await redis_1.redis.set(rateLimitKey, newCount.toString(), 3600);
         res.status(201).json({
             success: true,
             message: 'Message sent successfully! We will get back to you soon.',
@@ -68,29 +67,23 @@ router.post('/', [
                 timestamp: messageData.timestamp,
             },
         });
+        return;
     }
     catch (error) {
         console.error('Contact form error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-        });
+        res.status(500).json({ success: false, message: 'Server error' });
+        return;
     }
 });
-router.get('/', async (req, res) => {
+router.get('/', async (_req, res) => {
     try {
-        const messageKeys = await redis_1.redis.get('contact:*');
-        res.status(200).json({
-            success: true,
-            data: [],
-        });
+        res.status(200).json({ success: true, data: [] });
+        return;
     }
     catch (error) {
         console.error('Get contact messages error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-        });
+        res.status(500).json({ success: false, message: 'Server error' });
+        return;
     }
 });
 router.post('/newsletter', [
@@ -107,18 +100,17 @@ router.post('/newsletter', [
     try {
         const errors = (0, express_validator_1.validationResult)(req);
         if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                errors: errors.array(),
-            });
+            res.status(400).json({ success: false, errors: errors.array() });
+            return;
         }
         const { email, name } = req.body;
         const existing = await redis_1.redis.get(`newsletter:${email}`);
         if (existing) {
-            return res.status(409).json({
+            res.status(409).json({
                 success: false,
                 message: 'Email already subscribed',
             });
+            return;
         }
         const subscription = {
             email,
@@ -131,13 +123,12 @@ router.post('/newsletter', [
             success: true,
             message: 'Successfully subscribed to newsletter!',
         });
+        return;
     }
     catch (error) {
         console.error('Newsletter subscription error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-        });
+        res.status(500).json({ success: false, message: 'Server error' });
+        return;
     }
 });
 exports.default = router;

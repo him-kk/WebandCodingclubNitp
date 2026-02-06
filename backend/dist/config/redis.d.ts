@@ -293,7 +293,11 @@ export declare const redis: {
     set(key: string, value: string, expireInSeconds?: number): Promise<string | null>;
     get(key: string): Promise<string | null>;
     del(key: string): Promise<number>;
-    exists(key: string): Promise<number | false>;
+    delPattern(pattern: string): Promise<number>;
+    flushDB(): Promise<boolean>;
+    flushAll(): Promise<boolean>;
+    keys(pattern: string): Promise<string[]>;
+    exists(key: string): Promise<boolean>;
     hSet(key: string, field: string, value: string): Promise<number>;
     hGet(key: string, field: string): Promise<string | null | undefined>;
     hGetAll(key: string): Promise<{
@@ -303,6 +307,8 @@ export declare const redis: {
     getJSON(key: string): Promise<any>;
     incr(key: string): Promise<number>;
     decr(key: string): Promise<number>;
+    expire(key: string, seconds: number): Promise<boolean>;
+    ttl(key: string): Promise<number>;
 };
 export default redis;
 //# sourceMappingURL=redis.d.ts.map

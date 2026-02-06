@@ -1,14 +1,26 @@
 import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import dns from 'dns';
+
+dotenv.config();
+
+// Force Node.js to use Google DNS
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 export const connectDB = async () => {
+  const mongoURI = process.env.MONGODB_URI;
+
+  if (!mongoURI) {
+    throw new Error('MONGODB_URI is not defined');
+  }
+
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/web-coding-club';
-    
-    await mongoose.connect(mongoURI);
-    
+    await mongoose.connect(mongoURI, {
+      family: 4, // Force IPv4
+    });
     console.log(' MongoDB connected successfully');
   } catch (error) {
-    console.error(' MongoDB connection error:', error);
+    console.error('MongoDB connection error:', error);
     throw error;
   }
 };
@@ -19,7 +31,7 @@ mongoose.connection.on('connected', () => {
 });
 
 mongoose.connection.on('error', (err) => {
-  console.error(' Mongoose connection error:', err);
+  console.error('Mongoose connection error:', err);
 });
 
 mongoose.connection.on('disconnected', () => {

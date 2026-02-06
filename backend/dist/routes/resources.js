@@ -48,11 +48,11 @@ const roadmaps = [
         duration: '15 weeks',
         difficulty: 'Intermediate',
         steps: [
-            { id: 1, title: 'HTML & CSS Basics', description: 'Learn the building blocks of web', duration: '2 weeks', completed: false },
-            { id: 2, title: 'JavaScript Fundamentals', description: 'Master JS core concepts', duration: '3 weeks', completed: false },
-            { id: 3, title: 'React & Modern Frontend', description: 'Build modern UIs', duration: '4 weeks', completed: false },
-            { id: 4, title: 'Backend with Node.js', description: 'Server-side development', duration: '3 weeks', completed: false },
-            { id: 5, title: 'Database & DevOps', description: 'Data and deployment', duration: '3 weeks', completed: false },
+            { id: '1', title: 'HTML & CSS Basics', description: 'Learn the building blocks of web', duration: '2 weeks', completed: false },
+            { id: '2', title: 'JavaScript Fundamentals', description: 'Master JS core concepts', duration: '3 weeks', completed: false },
+            { id: '3', title: 'React & Modern Frontend', description: 'Build modern UIs', duration: '4 weeks', completed: false },
+            { id: '4', title: 'Backend with Node.js', description: 'Server-side development', duration: '3 weeks', completed: false },
+            { id: '5', title: 'Database & DevOps', description: 'Data and deployment', duration: '3 weeks', completed: false },
         ],
     },
     {
@@ -62,10 +62,10 @@ const roadmaps = [
         duration: '16 weeks',
         difficulty: 'Advanced',
         steps: [
-            { id: 1, title: 'Python & Math', description: 'Core programming and statistics', duration: '3 weeks', completed: false },
-            { id: 2, title: 'Machine Learning Basics', description: 'Supervised learning', duration: '4 weeks', completed: false },
-            { id: 3, title: 'Deep Learning', description: 'Neural networks with PyTorch', duration: '5 weeks', completed: false },
-            { id: 4, title: 'Computer Vision', description: 'Image processing and CNNs', duration: '4 weeks', completed: false },
+            { id: '1', title: 'Python & Math', description: 'Core programming and statistics', duration: '3 weeks', completed: false },
+            { id: '2', title: 'Machine Learning Basics', description: 'Supervised learning', duration: '4 weeks', completed: false },
+            { id: '3', title: 'Deep Learning', description: 'Neural networks with PyTorch', duration: '5 weeks', completed: false },
+            { id: '4', title: 'Computer Vision', description: 'Image processing and CNNs', duration: '4 weeks', completed: false },
         ],
     },
     {
@@ -75,11 +75,11 @@ const roadmaps = [
         duration: '12 weeks',
         difficulty: 'Intermediate',
         steps: [
-            { id: 1, title: 'React Native Basics', description: 'Mobile app fundamentals', duration: '3 weeks', completed: false },
-            { id: 2, title: 'State Management', description: 'Redux and Context API', duration: '2 weeks', completed: false },
-            { id: 3, title: 'Native Features', description: 'Camera, GPS, Push Notifications', duration: '3 weeks', completed: false },
-            { id: 4, title: 'Backend Integration', description: 'APIs and databases', duration: '2 weeks', completed: false },
-            { id: 5, title: 'Publishing Apps', description: 'App Store and Play Store', duration: '2 weeks', completed: false },
+            { id: '1', title: 'React Native Basics', description: 'Mobile app fundamentals', duration: '3 weeks', completed: false },
+            { id: '2', title: 'State Management', description: 'Redux and Context API', duration: '2 weeks', completed: false },
+            { id: '3', title: 'Native Features', description: 'Camera, GPS, Push Notifications', duration: '3 weeks', completed: false },
+            { id: '4', title: 'Backend Integration', description: 'APIs and databases', duration: '2 weeks', completed: false },
+            { id: '5', title: 'Publishing Apps', description: 'App Store and Play Store', duration: '2 weeks', completed: false },
         ],
     },
 ];
@@ -123,117 +123,101 @@ const blogPosts = [
         image: '/blog-3.jpg',
     },
 ];
-router.get('/roadmaps', async (req, res) => {
+router.get('/roadmaps', async (_req, res) => {
     try {
         const cacheKey = 'roadmaps:all';
-        const cached = await redis_1.redis.getJSON(cacheKey);
-        if (cached) {
-            return res.status(200).json({
-                success: true,
-                cached: true,
-                data: cached,
-            });
+        try {
+            const cached = await redis_1.redis.getJSON(cacheKey);
+            if (cached) {
+                return res.status(200).json({ success: true, cached: true, data: cached });
+            }
         }
-        await redis_1.redis.setJSON(cacheKey, roadmaps, 3600);
-        res.status(200).json({
-            success: true,
-            cached: false,
-            data: roadmaps,
-        });
+        catch (redisError) {
+            console.warn('Redis cache read failed:', redisError);
+        }
+        try {
+            await redis_1.redis.setJSON(cacheKey, roadmaps, 3600);
+        }
+        catch (redisError) {
+            console.warn('Redis cache write failed:', redisError);
+        }
+        return res.status(200).json({ success: true, cached: false, data: roadmaps });
     }
     catch (error) {
         console.error('Get roadmaps error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-        });
+        return res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 router.get('/roadmaps/:id', async (req, res) => {
     try {
-        const roadmap = roadmaps.find(r => r.id === req.params.id);
+        const roadmap = roadmaps.find((r) => r.id === req.params.id);
         if (!roadmap) {
-            return res.status(404).json({
-                success: false,
-                message: 'Roadmap not found',
-            });
+            return res.status(404).json({ success: false, message: 'Roadmap not found' });
         }
-        res.status(200).json({
-            success: true,
-            data: roadmap,
-        });
+        return res.status(200).json({ success: true, data: roadmap });
     }
     catch (error) {
         console.error('Get roadmap error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-        });
+        return res.status(500).json({ success: false, message: 'Server error' });
     }
 });
-router.get('/tutorials', async (req, res) => {
+router.get('/tutorials', async (_req, res) => {
     try {
-        const category = req.query.category;
-        const difficulty = req.query.difficulty;
-        let filteredTutorials = tutorials;
-        if (category) {
-            filteredTutorials = filteredTutorials.filter(t => t.category === category);
-        }
-        if (difficulty) {
-            filteredTutorials = filteredTutorials.filter(t => t.difficulty === difficulty);
-        }
-        res.status(200).json({
-            success: true,
-            count: filteredTutorials.length,
-            data: filteredTutorials,
-        });
+        const category = _req.query.category;
+        const difficulty = _req.query.difficulty;
+        let filtered = tutorials;
+        if (category)
+            filtered = filtered.filter((t) => t.category === category);
+        if (difficulty)
+            filtered = filtered.filter((t) => t.difficulty === difficulty);
+        return res.status(200).json({ success: true, count: filtered.length, data: filtered });
     }
     catch (error) {
         console.error('Get tutorials error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-        });
+        return res.status(500).json({ success: false, message: 'Server error' });
     }
 });
-router.get('/blog', async (req, res) => {
+router.get('/blog', async (_req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const category = req.query.category;
-        let filteredPosts = blogPosts;
-        if (category) {
-            filteredPosts = filteredPosts.filter(post => post.category === category);
-        }
-        const startIndex = (page - 1) * limit;
-        const endIndex = startIndex + limit;
-        const paginatedPosts = filteredPosts.slice(startIndex, endIndex);
-        res.status(200).json({
+        const page = parseInt(_req.query.page) || 1;
+        const limit = parseInt(_req.query.limit) || 10;
+        const category = _req.query.category;
+        let filtered = blogPosts;
+        if (category)
+            filtered = filtered.filter((p) => p.category === category);
+        const start = (page - 1) * limit;
+        const paginated = filtered.slice(start, start + limit);
+        return res.status(200).json({
             success: true,
-            count: paginatedPosts.length,
-            total: filteredPosts.length,
+            count: paginated.length,
+            total: filtered.length,
             page,
-            pages: Math.ceil(filteredPosts.length / limit),
-            data: paginatedPosts,
+            pages: Math.ceil(filtered.length / limit),
+            data: paginated,
         });
     }
     catch (error) {
         console.error('Get blog posts error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-        });
+        return res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 router.post('/roadmaps/:roadmapId/steps/:stepId/complete', auth_1.protect, async (req, res) => {
     try {
+        if (!req.user) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
         const { roadmapId, stepId } = req.params;
         const userId = req.user.userId;
         const progressKey = `progress:${userId}:${roadmapId}`;
-        const progress = await redis_1.redis.getJSON(progressKey) || { completedSteps: [] };
+        const progress = (await redis_1.redis.getJSON(progressKey)) || { completedSteps: [] };
         if (!progress.completedSteps.includes(stepId)) {
             progress.completedSteps.push(stepId);
-            await redis_1.redis.setJSON(progressKey, progress, 86400 * 30);
+            try {
+                await redis_1.redis.setJSON(progressKey, progress, 86400 * 30);
+            }
+            catch (redisError) {
+                console.warn('Redis save failed:', redisError);
+            }
             const User = (await Promise.resolve().then(() => __importStar(require('../models/User')))).default;
             const user = await User.findById(userId);
             if (user) {
@@ -241,52 +225,49 @@ router.post('/roadmaps/:roadmapId/steps/:stepId/complete', auth_1.protect, async
                 await user.save();
             }
         }
-        res.status(200).json({
-            success: true,
-            message: 'Step marked as complete',
-            data: progress,
-        });
+        return res.status(200).json({ success: true, message: 'Step marked as complete', data: progress });
     }
     catch (error) {
         console.error('Complete step error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-        });
+        return res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 router.get('/roadmaps/:roadmapId/progress', auth_1.protect, async (req, res) => {
     try {
+        if (!req.user) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
         const { roadmapId } = req.params;
         const userId = req.user.userId;
         const progressKey = `progress:${userId}:${roadmapId}`;
-        const progress = await redis_1.redis.getJSON(progressKey) || { completedSteps: [] };
-        const roadmap = roadmaps.find(r => r.id === roadmapId);
-        if (!roadmap) {
-            return res.status(404).json({
-                success: false,
-                message: 'Roadmap not found',
-            });
+        let progress;
+        try {
+            progress = (await redis_1.redis.getJSON(progressKey)) || { completedSteps: [] };
         }
-        const totalSteps = roadmap.steps.length;
-        const completedSteps = progress.completedSteps.length;
-        const completionPercentage = Math.round((completedSteps / totalSteps) * 100);
-        res.status(200).json({
+        catch (redisError) {
+            console.warn('Redis read failed:', redisError);
+            progress = { completedSteps: [] };
+        }
+        const roadmap = roadmaps.find((r) => r.id === roadmapId);
+        if (!roadmap) {
+            return res.status(404).json({ success: false, message: 'Roadmap not found' });
+        }
+        const total = roadmap.steps.length;
+        const completed = progress.completedSteps.length;
+        const percentage = total ? Math.round((completed / total) * 100) : 0;
+        return res.status(200).json({
             success: true,
             data: {
                 roadmap: roadmap.id,
                 completedSteps: progress.completedSteps,
-                totalSteps,
-                completionPercentage,
+                totalSteps: total,
+                completionPercentage: percentage,
             },
         });
     }
     catch (error) {
         console.error('Get progress error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-        });
+        return res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 exports.default = router;

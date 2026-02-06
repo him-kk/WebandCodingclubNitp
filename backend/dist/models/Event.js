@@ -37,62 +37,74 @@ const mongoose_1 = __importStar(require("mongoose"));
 const eventSchema = new mongoose_1.Schema({
     title: {
         type: String,
-        required: [true, 'Event title is required'],
+        required: [true, 'Please provide event title'],
         trim: true,
+        minlength: [3, 'Title must be at least 3 characters'],
         maxlength: [100, 'Title cannot exceed 100 characters'],
     },
     description: {
         type: String,
-        required: [true, 'Event description is required'],
+        required: [true, 'Please provide event description'],
+        trim: true,
+        minlength: [10, 'Description must be at least 10 characters'],
         maxlength: [1000, 'Description cannot exceed 1000 characters'],
     },
     date: {
         type: Date,
-        required: [true, 'Event date is required'],
+        required: [true, 'Please provide event date'],
     },
     time: {
         type: String,
-        required: [true, 'Event time is required'],
+        required: [true, 'Please provide event time'],
     },
     location: {
         type: String,
-        required: [true, 'Event location is required'],
+        required: [true, 'Please provide event location'],
     },
     image: {
         type: String,
-        default: null,
+        default: 'https://via.placeholder.com/400x300?text=Event+Image',
     },
     category: {
         type: String,
         enum: ['workshop', 'hackathon', 'competition', 'meetup', 'webinar'],
-        required: true,
+        default: 'workshop',
     },
-    attendees: [{
-            type: mongoose_1.default.Schema.Types.ObjectId,
-            ref: 'User',
-        }],
     maxAttendees: {
         type: Number,
         default: 100,
+        min: [1, 'Max attendees must be at least 1'],
     },
-    isOnline: {
-        type: Boolean,
-        default: false,
+    attendees: [
+        {
+            type: mongoose_1.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+    ],
+    points: {
+        type: Number,
+        default: 50,
+        min: [0, 'Points cannot be negative'],
     },
-    onlineLink: String,
-    requirements: [String],
-    tags: [String],
     status: {
         type: String,
         enum: ['upcoming', 'ongoing', 'completed', 'cancelled'],
         default: 'upcoming',
     },
-    points: {
-        type: Number,
-        default: 100,
+    registrationLink: {
+        type: String,
+        trim: true,
+        validate: {
+            validator: function (v) {
+                if (!v)
+                    return true;
+                return /^https?:\/\/.+/.test(v);
+            },
+            message: 'Please provide a valid URL for registration link',
+        },
     },
     createdBy: {
-        type: mongoose_1.default.Schema.Types.ObjectId,
+        type: mongoose_1.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
     },
@@ -101,5 +113,6 @@ const eventSchema = new mongoose_1.Schema({
 });
 eventSchema.index({ date: 1, status: 1 });
 eventSchema.index({ category: 1 });
+eventSchema.index({ createdBy: 1 });
 exports.default = mongoose_1.default.model('Event', eventSchema);
 //# sourceMappingURL=Event.js.map

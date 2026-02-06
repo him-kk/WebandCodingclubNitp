@@ -45,13 +45,22 @@ router.post('/register', [
             password,
         });
         await user.save();
-        const token = jsonwebtoken_1.default.sign({ userId: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET || 'fallback-secret', { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
-        await redis_1.redis.setJSON(`session:${user._id}`, {
-            userId: user._id,
+        const token = jsonwebtoken_1.default.sign({
+            userId: user._id.toString(),
             email: user.email,
-            role: user.role,
-        }, 604800);
-        res.status(201).json({
+            role: user.role
+        }, process.env.JWT_SECRET || 'fallback-secret', { expiresIn: '7d' });
+        try {
+            await redis_1.redis.setJSON(`session:${user._id}`, {
+                userId: user._id.toString(),
+                email: user.email,
+                role: user.role,
+            }, 604800);
+        }
+        catch (redisError) {
+            console.warn('Redis session storage failed:', redisError);
+        }
+        return res.status(201).json({
             success: true,
             message: 'User registered successfully',
             token,
@@ -69,7 +78,7 @@ router.post('/register', [
     }
     catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Server error during registration',
         });
@@ -109,19 +118,28 @@ router.post('/login', [
         }
         user.lastLogin = new Date();
         await user.save();
-        const token = jsonwebtoken_1.default.sign({ userId: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET || 'fallback-secret', { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
-        await redis_1.redis.setJSON(`session:${user._id}`, {
-            userId: user._id,
+        const token = jsonwebtoken_1.default.sign({
+            userId: user._id.toString(),
             email: user.email,
-            role: user.role,
-        }, 604800);
+            role: user.role
+        }, process.env.JWT_SECRET || 'fallback-secret', { expiresIn: '7d' });
+        try {
+            await redis_1.redis.setJSON(`session:${user._id}`, {
+                userId: user._id.toString(),
+                email: user.email,
+                role: user.role,
+            }, 604800);
+        }
+        catch (redisError) {
+            console.warn('Redis session storage failed:', redisError);
+        }
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: parseInt(process.env.JWT_COOKIE_EXPIRES || '7') * 24 * 60 * 60 * 1000,
+            maxAge: 7 * 24 * 60 * 60 * 1000,
         });
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             message: 'Login successful',
             token,
@@ -139,7 +157,7 @@ router.post('/login', [
     }
     catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Server error during login',
         });
@@ -147,17 +165,24 @@ router.post('/login', [
 });
 router.post('/logout', auth_1.protect, async (req, res) => {
     try {
-        const userId = req.user.userId;
-        await redis_1.redis.del(`session:${userId}`);
+        const userId = req.user?.userId;
+        if (userId) {
+            try {
+                await redis_1.redis.del(`session:${userId}`);
+            }
+            catch (redisError) {
+                console.warn('Redis session deletion failed:', redisError);
+            }
+        }
         res.clearCookie('token');
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             message: 'Logged out successfully',
         });
     }
     catch (error) {
         console.error('Logout error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Server error during logout',
         });
@@ -165,14 +190,14 @@ router.post('/logout', auth_1.protect, async (req, res) => {
 });
 router.get('/me', auth_1.protect, async (req, res) => {
     try {
-        const user = await User_1.default.findById(req.user.userId).select('-__v');
+        const user = await User_1.default.findById(req.user?.userId).select('-__v');
         if (!user) {
             return res.status(404).json({
                 success: false,
                 message: 'User not found',
             });
         }
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             user: {
                 id: user._id,
@@ -197,7 +222,7 @@ router.get('/me', auth_1.protect, async (req, res) => {
     }
     catch (error) {
         console.error('Get user error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Server error',
         });
@@ -213,22 +238,31 @@ router.post('/refresh', async (req, res) => {
             });
         }
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET || 'fallback-secret');
-        const session = await redis_1.redis.getJSON(`session:${decoded.userId}`);
-        if (!session) {
-            return res.status(401).json({
-                success: false,
-                message: 'Session expired',
-            });
+        try {
+            const session = await redis_1.redis.getJSON(`session:${decoded.userId}`);
+            if (!session) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Session expired',
+                });
+            }
         }
-        const newToken = jsonwebtoken_1.default.sign({ userId: decoded.userId, email: decoded.email, role: decoded.role }, process.env.JWT_SECRET || 'fallback-secret', { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
-        res.status(200).json({
+        catch (redisError) {
+            console.warn('Redis session check failed:', redisError);
+        }
+        const newToken = jsonwebtoken_1.default.sign({
+            userId: decoded.userId,
+            email: decoded.email,
+            role: decoded.role
+        }, process.env.JWT_SECRET || 'fallback-secret', { expiresIn: '7d' });
+        return res.status(200).json({
             success: true,
             token: newToken,
         });
     }
     catch (error) {
         console.error('Token refresh error:', error);
-        res.status(401).json({
+        return res.status(401).json({
             success: false,
             message: 'Invalid token',
         });

@@ -13,19 +13,19 @@ const connectRedis = async () => {
             console.error(' Redis Client Error:', err);
         });
         redisClient.on('connect', () => {
-            console.log(' Redis client connecting...');
+            console.log('Redis client connecting...');
         });
         redisClient.on('ready', () => {
             console.log(' Redis client connected and ready');
         });
         redisClient.on('end', () => {
-            console.log(' Redis client disconnected');
+            console.log('🔌 Redis client disconnected');
         });
         await redisClient.connect();
         console.log(' Redis connected successfully');
     }
     catch (error) {
-        console.error(' Redis connection error:', error);
+        console.error('Redis connection error:', error);
         if (process.env.NODE_ENV === 'production') {
             throw error;
         }
@@ -73,11 +73,70 @@ exports.redis = {
             return 0;
         }
     },
+    async delPattern(pattern) {
+        if (!redisClient?.isReady)
+            return 0;
+        try {
+            const keys = [];
+            for await (const key of redisClient.scanIterator({ MATCH: pattern, COUNT: 100 })) {
+                keys.push(key);
+            }
+            if (keys.length === 0) {
+                console.log(`No keys found matching pattern: ${pattern}`);
+                return 0;
+            }
+            const deleted = await redisClient.del(keys);
+            console.log(` Deleted ${deleted} keys matching pattern: ${pattern}`);
+            return deleted;
+        }
+        catch (error) {
+            console.error('Redis delPattern error:', error);
+            return 0;
+        }
+    },
+    async flushDB() {
+        if (!redisClient?.isReady)
+            return false;
+        try {
+            await redisClient.flushDb();
+            console.log('Redis database flushed');
+            return true;
+        }
+        catch (error) {
+            console.error('Redis flushDB error:', error);
+            return false;
+        }
+    },
+    async flushAll() {
+        if (!redisClient?.isReady)
+            return false;
+        try {
+            await redisClient.flushAll();
+            console.log('All Redis databases flushed');
+            return true;
+        }
+        catch (error) {
+            console.error('Redis flushAll error:', error);
+            return false;
+        }
+    },
+    async keys(pattern) {
+        if (!redisClient?.isReady)
+            return [];
+        try {
+            return await redisClient.keys(pattern);
+        }
+        catch (error) {
+            console.error('Redis keys error:', error);
+            return [];
+        }
+    },
     async exists(key) {
         if (!redisClient?.isReady)
             return false;
         try {
-            return await redisClient.exists(key);
+            const result = await redisClient.exists(key);
+            return result === 1;
         }
         catch (error) {
             console.error('Redis exists error:', error);
@@ -164,6 +223,29 @@ exports.redis = {
         catch (error) {
             console.error('Redis decr error:', error);
             return 0;
+        }
+    },
+    async expire(key, seconds) {
+        if (!redisClient?.isReady)
+            return false;
+        try {
+            const result = await redisClient.expire(key, seconds);
+            return result === true;
+        }
+        catch (error) {
+            console.error('Redis expire error:', error);
+            return false;
+        }
+    },
+    async ttl(key) {
+        if (!redisClient?.isReady)
+            return -1;
+        try {
+            return await redisClient.ttl(key);
+        }
+        catch (error) {
+            console.error('Redis ttl error:', error);
+            return -1;
         }
     },
 };
