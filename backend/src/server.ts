@@ -28,7 +28,10 @@ import { connectRedis } from './config/redis';
 // Import socket handlers
 import { setupSocketHandlers } from './socket/handlers';
 
-dotenv.config();
+// Only load dotenv in development
+if (process.env.NODE_ENV !== 'production') {
+  import('dotenv').then(dotenv => dotenv.config());
+}
 
 const app = express();
 const server = createServer(app);

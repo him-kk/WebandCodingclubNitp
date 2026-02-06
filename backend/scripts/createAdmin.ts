@@ -7,7 +7,7 @@ dotenv.config();
 const createAdmin = async () => {
   try {
     // Connect to database
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/web-coding-club');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://himanshu315tiwari_db_user:cBnfhGIuBn51ptXi@cluster0.lr9judv.mongodb.net/webcodingclub?retryWrites=true&w=majority&appName=Cluster0');
     console.log('Connected to MongoDB');
 
     // Check if admin already exists
