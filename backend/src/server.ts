@@ -29,6 +29,8 @@ import { connectRedis } from './config/redis';
 import { setupSocketHandlers } from './socket/handlers';
 
 // Only load dotenv in development
+
+
 if (process.env.NODE_ENV !== 'production') {
   import('dotenv').then(dotenv => dotenv.config());
 }
@@ -40,6 +42,12 @@ const server = createServer(app);
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',')
   : ['http://localhost:5173', 'http://localhost:5174'];
+
+// ADD THIS - Express CORS middleware
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
 
 const io = new Server(server, {
   cors: {
