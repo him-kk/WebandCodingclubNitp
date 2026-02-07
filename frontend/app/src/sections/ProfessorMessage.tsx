@@ -36,7 +36,7 @@ const ProfessorMessage = () => {
               <div className="relative aspect-[4/5] rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-sm">
                 {/* Replace with your professor's image */}
                 <img
-                  src="web-coding-club\frontend\app\public\professor.jpg"
+                  src="public\professor.jpg"
                   alt="Professor Name"
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />
