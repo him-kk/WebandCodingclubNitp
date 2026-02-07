@@ -29,33 +29,37 @@ import { connectRedis } from './config/redis';
 import { setupSocketHandlers } from './socket/handlers';
 
 // Only load dotenv in development
-
-
 if (process.env.NODE_ENV !== 'production') {
-  import('dotenv').then(dotenv => dotenv.config());
+  dotenv.config();
 }
 
 const app = express();
 const server = createServer(app);
-
-// Get allowed origins from environment variable
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://localhost:5174'];
-
-// ADD THIS - Express CORS middleware
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true,
-}));
-
-const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    credentials: true,
-  },
-});
 const PORT = process.env.PORT || 5000;
+
+// Define allowed origins
+const allowedOrigins = [
+  'https://weband-codingclub-nitp-9b5d.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5174'
+];
+
+// CORS Configuration - MUST BE FIRST
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token'],
+}));
 
 // Security middleware
 app.use(helmet({
@@ -69,22 +73,13 @@ app.use(helmet({
   },
 }));
 
-// Rate limiting (increase for dev if needed)
+// Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 mins
-  max: 500,                 // increase requests limit
+  max: 500,
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use('/api/', limiter);
-
-// CORS for dev and prod
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', process.env.FRONTEND_URL || 'http://localhost:5174'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token'],
-}));
-
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -123,6 +118,14 @@ app.get('/api/health', (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
+// Socket.IO config
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    credentials: true,
+  },
+});
+
 // Socket.IO setup
 setupSocketHandlers(io);
 
@@ -136,7 +139,7 @@ const startServer = async () => {
     server.listen(PORT, () => {
       console.log(` Web and Coding Club Server running on port ${PORT}`);
       console.log(` Environment: ${process.env.NODE_ENV}`);
-      console.log(` Frontend: ${process.env.FRONTEND_URL || 'http://localhost:5174'}`);
+      console.log(` Allowed Origins: ${allowedOrigins.join(', ')}`);
     });
   } catch (error) {
     console.error(' Failed to start server:', error);
@@ -145,6 +148,5 @@ const startServer = async () => {
 };
 
 startServer();
-
 
 export default app;
